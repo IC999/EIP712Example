@@ -1,5 +1,4 @@
 import React, { Component } from "react";
-import SimpleStorageContract from "./contracts/SimpleStorage.json";
 import getWeb3 from "./getWeb3";
 import "./App.css";
 var ethUtil = require('ethereumjs-util');
@@ -10,6 +9,7 @@ class App extends Component {
 
   componentDidMount = async () => {
     try {
+      console.log("componwentdidmount called");
       // Get network provider and web3 instance.
       const web3 = await getWeb3();
 
@@ -18,14 +18,11 @@ class App extends Component {
 
       // Get the contract instance.
       const networkId = await web3.eth.net.getId();
-      const deployedNetwork = SimpleStorageContract.networks[networkId];
-      const instance = new web3.eth.Contract(
-        SimpleStorageContract.abi,
-        deployedNetwork && deployedNetwork.address,
-      );
+      // const deployedNetwork = SimpleStorageContract.networks[networkId];
+
       // Set web3, accounts, and contract to the state, and then proceed with an
       // example of interacting with the contract's methods.
-      this.setState({ web3, accounts, contract: instance }, this.runExample);
+      this.setState({ web3, accounts }, this.runExample);
     } catch (error) {
       // Catch any errors for any of the above operations.
       alert(
@@ -36,15 +33,16 @@ class App extends Component {
   };
 
   runExample = async () => {
-    const { accounts, contract } = this.state;
-    // Get the value from the contract to prove it worked.
-    const response = await contract.methods.get().call();
-    // Update state with the result.
-    this.setState({ storageValue: response });
+    console.log("run example called");
+    // const { accounts } = this.state;
+    // // Get the value from the contract to prove it worked.
+    // const response = await contract.methods.get().call();
+    // // Update state with the result.
+    // this.setState({ storageValue: response });
   };
 
   signData = async () => {
-    const { web3, accounts, contract } = this.state;
+    const { web3, accounts } = this.state;
     var signer = accounts[0];
     var deadline = Date.now() + 100000;
     console.log(deadline);
@@ -57,27 +55,62 @@ class App extends Component {
     }, function (err, result) {
       const netId = result.result;
       console.log("netId", netId);
-      const msgParams = JSON.stringify({types:
-        {
-        EIP712Domain:[
-          {name:"name",type:"string"},
-          {name:"version",type:"string"},
-          {name:"chainId",type:"uint256"},
-          {name:"verifyingContract",type:"address"}
+      const msgParams = JSON.stringify({types: {
+        GPDomain: [
+            {
+                name: "name",
+                type: "string"
+            },
+            {
+                name: "version",
+                type: "string"
+            },
+            {
+                name: "salt",
+                type: "bytes32"
+            }
         ],
-        set:[
-          {name:"sender",type:"address"},
-          {name:"x",type:"uint"},
-          {name:"deadline", type:"uint"}
+        GPBatchSubDomainTransaction: [
+            {
+                name: "name",
+                type: "string[]"
+            },
+            {
+                name: "label",
+                type: "string[]"
+            },
+            {
+                name: "owner",
+                type: "address[]"
+            },
+            {
+                name: "chainid",
+                type: "uint256"
+            },
+            {
+                name: "sender",
+                type: "address"
+            }
         ]
       },
-      //make sure to replace verifyingContract with address of deployed contract
-      primaryType:"set",
-      domain:{name:"SetTest",version:"1",chainId:netId,verifyingContract:"0x803B558Fd23967F9d37BaFe2764329327f45e89E"},
-      message:{
-        sender: signer,
-        x: x,
-        deadline: deadline
+      domain: {
+          name: "EIP-712GeneralPurposeDomain",
+          version: "1",
+          salt: "0x7cf4c8112fb7ffc1fc4226030109130b48d3f947cfd6789f1b9cf974c6a7c22d"
+      },
+      primaryType: "GPBatchSubDomainTransaction",
+      message: {
+          name: [
+              "ic1", "ic2"
+          ],
+          label: [
+              "b", "c"
+          ],
+          owner: [
+              "0x654b39f5a9fc17340ee711b0c7fc0423108251e7", "0x654b39f5a9fc17340ee711b0c7fc0423108251e7"
+          ],
+          chainid: 4,
+          sender: "0x4CeBBdbBdFe8A1BB3F62A75B5fe9ebaE5D105f8F"
       }
       })
 
@@ -86,7 +119,7 @@ class App extends Component {
       console.log('CLICKED, SENDING PERSONAL SIGN REQ', 'from', from, msgParams)
       var params = [from, msgParams]
       console.dir(params)
-      var method = 'eth_signTypedData_v3'
+      var method = 'eth_signTypedData_v4'
     
       web3.currentProvider.sendAsync({
         method,
@@ -100,7 +133,7 @@ class App extends Component {
         if (result.error) return console.error('ERROR', result)
         console.log('TYPED SIGNED:' + JSON.stringify(result.result))
     
-        const recovered = sigUtil.recoverTypedSignature({ data: JSON.parse(msgParams), sig: result.result })
+        const recovered = sigUtil.recoverTypedSignature_v4({ data: JSON.parse(msgParams), sig: result.result })
     
         if (ethUtil.toChecksumAddress(recovered) === ethUtil.toChecksumAddress(from)) {
           alert('Successfully ecRecovered signer as ' + from)
@@ -109,19 +142,19 @@ class App extends Component {
         }
 
         //getting r s v from a signature
-        const signature = result.result.substring(2);
-        const r = "0x" + signature.substring(0, 64);
-        const s = "0x" + signature.substring(64, 128);
-        const v = parseInt(signature.substring(128, 130), 16);
-        console.log("r:", r);
-        console.log("s:", s);
-        console.log("v:", v);
+        // const signature = result.result.substring(2);
+        // const r = "0x" + signature.substring(0, 64);
+        // const s = "0x" + signature.substring(64, 128);
+        // const v = parseInt(signature.substring(128, 130), 16);
+        // console.log("r:", r);
+        // console.log("s:", s);
+        // console.log("v:", v);
 
-        await contract.methods.executeSetIfSignatureMatch(v,r,s,signer, deadline, x).send({ from: accounts[0] });
       }) 
     })
   }
   render() {
+    console.log("render called");
     if (!this.state.web3) {
       return <div>Loading Web3, accounts, and contract...</div>;
     }
